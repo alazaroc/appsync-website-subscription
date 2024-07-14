@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Subscriptions (real-time messages)</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      .table-results {
+        margin: 25px 0;
+        font-size: 1em;
+        font-family: 'Arial', sans-serif;
+        min-width: 400px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+        padding: 20px;
+        border: 1px solid #dddddd;
+        border-radius: 4px;
+      }
+      .table-results h2 {
+        background-color: #0073e6;
+        color: #ffffff;
+        padding: 12px 15px;
+        margin: -20px -20px 20px -20px;
+        border-radius: 4px 4px 0 0;
+      }
+      .notification-item {
+        padding: 12px 15px;
+        border: 1px solid #dddddd;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      .notification-item p {
+        margin: 5px 0;
+      }
+      .no-notifications {
+        font-size: 1em;
+        font-family: 'Arial', sans-serif;
+        color: #333;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>AppSync subscription demo</h1>
+      <div id="notifications" class="table-results">
+        <h2>Messages</h2>
+        <div id="noNotifications" class="no-notifications">
+          <p>No realtime messages</p>
+        </div>
+      </div>
+    </div>
+    <script>
+      // TODO: Credentials, update here with your values
+      const AWS_REGION = "eu-west-1"
+      const APPSYNC_ENDPOINT_ID = "h4ztuk7rgregxdytutkdfhhdm4";
+      const APPSYNC_API_KEY = "da2-k5zgxcdpibgsfnjk6kq2v5jymm";
+      // End credentials
+
+      function encodeAppSyncCredentials() {
+        const creds = {
+          host: `${APPSYNC_ENDPOINT_ID}.appsync-api.${AWS_REGION}.amazonaws.com`,
+          "x-api-key": APPSYNC_API_KEY,
+        };
+        return window.btoa(JSON.stringify(creds));
+      }
+
+      function getWebsocketUrl() {
+        const header = encodeAppSyncCredentials();
+        const payload = window.btoa(JSON.stringify({}));
+        return `wss://${APPSYNC_ENDPOINT_ID}.appsync-realtime-api.${AWS_REGION}.amazonaws.com/graphql?header=${header}&payload=${payload}`;
+      }
+
+      function startSubscription(websocket) {
+        const subscribeMessage = {
+          id: window.crypto.randomUUID(),
+          type: "start",
+          payload: {
+            data: JSON.stringify({
+              query: `subscription onCreateMessages {
+                        onCreateMessages {
+                          id
+                          message
+                        }
+                    }`,
+            }),
+            extensions: {
+              authorization: {
+                "x-api-key": APPSYNC_API_KEY,
+                host: `${APPSYNC_ENDPOINT_ID}.appsync-api.${AWS_REGION}.amazonaws.com`,
+              },
+            },
+          },
+        };
+        websocket.send(JSON.stringify(subscribeMessage));
+      }
+
+      function handleNotification(message) {
+        const notificationsList = document.getElementById("notifications");
+        const notificationElem = document.createElement("div");
+        notificationElem.className = "notification-item";
+        notificationElem.innerHTML = `
+          <p><strong>ID:</strong> ${message.id}</p>
+          <p><strong>Message:</strong> ${message.message}</p>
+        `;
+        notificationsList.appendChild(notificationElem);
+        document.getElementById("noNotifications").style.display = "none";
+      }
+
+      const url = getWebsocketUrl();
+      const websocket = new WebSocket(url, ["graphql-ws"]);
+
+      websocket.addEventListener("open", () => {
+        websocket.send(
+          JSON.stringify({
+            type: "connection_init",
+          })
+        );
+      });
+
+      websocket.addEventListener("message", (event) => {
+        const message = JSON.parse(event.data);
+        console.log(message);
+
+        switch (message.type) {
+          case "connection_ack":
+            startSubscription(websocket);
+            break;
+          case "start_ack":
+            console.log("start_ack");
+            break;
+          case "error":
+            console.error(message);
+            break;
+          case "data":
+            handleNotification(message.payload.data.onCreateMessages);
+            break;
+        }
+      });
+    </script>
+  </body>
+</html>
