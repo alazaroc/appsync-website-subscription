@@ -1,5 +1,7 @@
 # AppSync subscription demo
 
+> This subscription application has been used as example in this article [https://www.playingaws.com/posts/building-real-time-applications-with-appsync-and-subscriptions/](https://www.playingaws.com/posts/building-real-time-applications-with-appsync-and-subscriptions/)
+
 ## pre-requisites
 
 1. DynamoDB table created (check the `infrastructure` folder to find the Terraform code)
